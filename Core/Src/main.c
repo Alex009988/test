@@ -65,6 +65,28 @@ void StartDefaultTask(void const * argument);
   * @brief  The application entry point.
   * @retval int
   */
+//функция отправки строки в SWDIO
+void send_to_swdio(const char *message) {
+    printf("%s\n", message);
+}
+
+//задача для FreeRTOS
+void vTaskMonitorPin(void *pvParameters) {
+    GPIO_PinState lastState = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10);
+    GPIO_PinState currentState;
+    for(;;) {
+        currentState = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10);
+        if (currentState != lastState) {
+            if (currentState == GPIO_PIN_SET) {
+                send_to_swdio("Power is UP");
+            } else {
+                send_to_swdio("Power is DOWN");
+            }
+            lastState = currentState;
+        }
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
 int main(void)
 {
 
@@ -120,6 +142,8 @@ int main(void)
   /* USER CODE END RTOS_THREADS */
 
   /* Start scheduler */
+  // задача мониторинга состояния пина PA10
+  xTaskCreate(vTaskMonitorPin, "skillbox", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
   osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
