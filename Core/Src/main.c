@@ -43,6 +43,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 osThreadId defaultTaskHandle;
+SemaphoreHandle_t xSemaphore;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -51,6 +52,9 @@ osThreadId defaultTaskHandle;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 void StartDefaultTask(void const * argument);
+void vTaskMonitorPin(void *pvParameters);
+void send_to_swdio(const char *message);
+
 
 /* USER CODE BEGIN PFP */
 
@@ -67,7 +71,10 @@ void StartDefaultTask(void const * argument);
   */
 //функция отправки строки в SWDIO
 void send_to_swdio(const char *message) {
-    printf("%s\n", message);
+    if (xSemaphoreTake(xSemaphore, portMAX_DELAY) == pdTRUE) {
+        printf("%s\n", message);
+        xSemaphoreGive(xSemaphore);
+    }
 }
 
 //задача для FreeRTOS
@@ -134,18 +141,21 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+  //Создание семафора
+  xSemaphore = xSemaphoreCreateMutex();
+  if (xSemaphore != NULL) {
+      osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 128);
+      defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
+      /* USER CODE BEGIN RTOS_THREADS */
+      /* add threads, ... */
+      /* USER CODE END RTOS_THREADS */
 
-  /* Start scheduler */
-  // задача мониторинга состояния пина PA10
-  xTaskCreate(vTaskMonitorPin, "skillbox", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-  osKernelStart();
-
+      /* Start scheduler */
+      // задача мониторинга состояния пина PA10
+      xTaskCreate(vTaskMonitorPin, "skillbox", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+      osKernelStart();
+  }
   /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
